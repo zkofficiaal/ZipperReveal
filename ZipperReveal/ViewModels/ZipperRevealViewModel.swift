@@ -3,144 +3,141 @@
 //  ZipperReveal
 //
 //  Created by Z.K   on 11/09/2026.
-//  ViewModel responsible for zipper animation playback.
+//
+//  ViewModel responsible for direct zipper interaction.
 //
 
 import Foundation
 import Combine
 import SwiftUI
 
-/// Controls the zipper reveal animation.
+/// Owns the zipper's persistent interaction state.
+///
+/// The zipper is completely gesture-driven:
+/// - Drag down increases progress.
+/// - Drag up decreases progress.
+/// - Releasing the finger keeps the current progress.
+/// - A new drag starts from the current progress.
 @MainActor
 final class ZipperRevealViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    /// Controls whether the animation is running.
-    @Published private(set) var isPlaying: Bool = true
+    /// Opening progress from 0 to 1.
+    ///
+    /// 0 = completely closed.
+    /// 1 = completely open.
+    @Published private(set) var progress: CGFloat = 0
+
+    /// Current visual phase derived from the user's drag direction.
+    @Published private(set) var phase: ZipperPhase = .closed
 
     // MARK: - Configuration
 
     /// Central zipper configuration.
-    let configuration =
-        ZipperConfiguration()
+    let configuration: ZipperConfiguration
 
-    // MARK: - Animation Service
+    // MARK: - Drag State
 
-    /// Calculates animation progress.
-    private let animationService:
-        ZipperAnimationService
+    /// Progress at the moment the current drag begins.
+    private var dragStartProgress: CGFloat = 0
 
-    // MARK: - Timing
-
-    /// Time at which the animation timeline started.
-    private var startDate: Date
-
-    /// Elapsed timeline position when paused.
-    private var pausedElapsedTime: TimeInterval = 0
+    /// Indicates that a zipper drag is currently active.
+    private var isDragging = false
 
     // MARK: - Initialization
 
     init() {
-
-        let configuration =
-            ZipperConfiguration()
-
-        self.configuration =
-            configuration
-
-        self.animationService =
-            ZipperAnimationService(
-                configuration: configuration
-            )
-
-        self.startDate =
-            Date()
+        self.configuration = ZipperConfiguration()
     }
 
-    // MARK: - Current State
+    // MARK: - Drag Interaction
 
-    /// Returns the current animation state for a specific timeline date.
-    func state(
-        at date: Date
-    ) -> ZipperAnimationState {
+    /// Starts a new drag from the zipper's current position.
+    func beginDrag() {
+        dragStartProgress = progress
+        isDragging = true
+    }
 
-        let elapsedTime: TimeInterval
-
-        if isPlaying {
-
-            elapsedTime =
-                date.timeIntervalSince(
-                    startDate
-                )
-
-        } else {
-
-            elapsedTime =
-                pausedElapsedTime
+    /// Updates the zipper directly from the finger/cursor translation.
+    ///
+    /// Positive vertical translation opens the zipper.
+    /// Negative vertical translation closes it.
+    ///
+    /// No animation is applied here so the zipper follows the finger
+    /// immediately.
+    func updateDrag(
+        translationY: CGFloat,
+        zipperTravel: CGFloat
+    ) {
+        guard zipperTravel > 0 else {
+            return
         }
 
-        return animationService.state(
-            at: elapsedTime
+        // The first change event establishes the starting point
+        // for this drag. Every following event uses the same
+        // starting progress, so the movement stays 1:1.
+        if !isDragging {
+            beginDrag()
+        }
+
+        let normalizedTranslation =
+            translationY / zipperTravel
+
+        let newProgress =
+            dragStartProgress + normalizedTranslation
+
+        progress =
+            newProgress.clamped(
+                lowerBound: 0,
+                upperBound: 1
+            )
+
+        updatePhase(
+            translationY: translationY
         )
     }
 
-    // MARK: - Play / Pause
-
-    /// Toggles animation playback.
-    func togglePlayback() {
-
-        if isPlaying {
-
-            pause()
-
-        } else {
-
-            play()
-        }
-    }
-
-    /// Pauses the animation at its current position.
-    func pause() {
-
-        guard isPlaying else {
-            return
-        }
-
-        pausedElapsedTime =
-            Date()
-            .timeIntervalSince(
-                startDate
-            )
-
-        isPlaying = false
-    }
-
-    /// Resumes the animation from the paused position.
-    func play() {
-
-        guard !isPlaying else {
-            return
-        }
-
-        startDate =
-            Date()
-            .addingTimeInterval(
-                -pausedElapsedTime
-            )
-
-        isPlaying = true
+    /// Ends the current drag.
+    ///
+    /// The current progress is intentionally left untouched.
+    func endDrag() {
+        isDragging = false
+        updatePhase()
     }
 
     // MARK: - Reset
 
-    /// Resets the zipper to the beginning of the animation.
+    /// Returns the zipper to the completely closed position.
+    ///
+    /// This is a direct state change, not an automatic animation.
     func reset() {
+        progress = 0
+        dragStartProgress = 0
+        isDragging = false
+        phase = .closed
+    }
 
-        pausedElapsedTime = 0
+    // MARK: - Phase
 
-        startDate = Date()
+    /// Updates the visual phase from the current interaction.
+    private func updatePhase(
+        translationY: CGFloat = 0
+    ) {
+        if progress <= 0.001 {
+            phase = .closed
+            return
+        }
 
-        isPlaying = true
+        if progress >= 0.999 {
+            phase = .opened
+            return
+        }
+
+        if translationY > 0.001 {
+            phase = .opening
+        } else if translationY < -0.001 {
+            phase = .closing
+        }
     }
 }

@@ -3,7 +3,6 @@
 //  ZipperReveal
 //
 //  Created by Z.K   on 11/09/2026.
-//  Created by Z.K   on 11/09/2026.
 //
 //  Procedural zipper rendering using SwiftUI Canvas.
 //
@@ -30,6 +29,12 @@ struct ZipperCanvasView: View {
     // MARK: - Body
 
     var body: some View {
+
+        let currentProgress =
+            progress.clamped(
+                lowerBound: 0,
+                upperBound: 1
+            )
 
         GeometryReader { proxy in
 
@@ -58,7 +63,7 @@ struct ZipperCanvasView: View {
 
                 // MARK: Closed State
 
-                if progress <= 0.001 {
+                if currentProgress <= 0.001 {
 
                     drawClosedZipper(
                         context: &context,
@@ -81,7 +86,7 @@ struct ZipperCanvasView: View {
                 drawSlider(
                     context: &context,
                     geometry: geometry,
-                    progress: progress
+                    progress: currentProgress
                 )
             }
 

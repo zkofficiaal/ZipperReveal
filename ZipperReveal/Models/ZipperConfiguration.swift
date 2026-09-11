@@ -83,4 +83,9 @@ struct ZipperConfiguration {
         + openedHoldDuration
         + closingDuration
     }
+    
+    /// Color of the fabric on either side of the zipper.
+    var fabricColor: Color {
+        Color(white: 0.15) // Adjust to your preferred dark/light shade
+    }
 }

@@ -3,7 +3,8 @@
 //  ZipperReveal
 //
 //  Created by Z.K   on 11/09/2026.
-//  Main screen for the zipper reveal animation.
+//
+//  Main screen for the direct-manipulation zipper reveal.
 //
 
 import SwiftUI
@@ -27,47 +28,72 @@ struct ZipperRevealView: View {
             Color.black
                 .ignoresSafeArea()
 
-            // MARK: Animation
+            // MARK: Zipper / Phone
 
-            TimelineView(
-                .animation(
-                    minimumInterval: 1.0 / 60.0
-                )
-            ) { timeline in
+            GeometryReader { proxy in
 
-                let state =
-                    viewModel.state(
-                        at: timeline.date
+                let size =
+                    proxy.size
+
+                let geometry =
+                    ZipperGeometry(
+                        canvasSize: size,
+                        configuration:
+                            viewModel.configuration
                     )
 
-                GeometryReader { proxy in
+                ZStack {
 
-                    ZStack {
+                    // MARK: Phone
 
-                        // MARK: Phone
-
-                        PhoneContentView(
-                            configuration:
-                                viewModel.configuration
-                        )
-
-                        // MARK: Zipper
-
-                        ZipperCanvasView(
-                            progress:
-                                state.progress,
-                            phase:
-                                state.phase,
-                            configuration:
-                                viewModel.configuration
-                        )
-                    }
-
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height
+                    PhoneContentView(
+                        configuration:
+                            viewModel.configuration
                     )
+
+                    // MARK: Zipper
+
+                    ZipperCanvasView(
+                        progress:
+                            viewModel.progress,
+                        phase:
+                            viewModel.phase,
+                        configuration:
+                            viewModel.configuration
+                    )
+
+                    // MARK: Zipper Interaction Area
+
+                    // The whole zipper width/height is interactive.
+                    // The user does not need to hit the tiny slider.
+                    Color.clear
+                        .frame(
+                            width:
+                                geometry.zipperWidth,
+                            height:
+                                geometry.zipperHeight
+                        )
+                        .contentShape(
+                            Rectangle()
+                        )
+                        .position(
+                            x:
+                                geometry.centerX,
+                            y:
+                                geometry.centerY
+                        )
+                        .gesture(
+                            zipperDrag(
+                                travel:
+                                    geometry.sliderBottomY
+                                    - geometry.sliderTopY
+                            )
+                        )
                 }
+                .frame(
+                    width: size.width,
+                    height: size.height
+                )
             }
 
             // MARK: Controls
@@ -78,6 +104,30 @@ struct ZipperRevealView: View {
         // MARK: Full Screen
 
         .ignoresSafeArea()
+    }
+
+    // MARK: - Zipper Drag
+
+    /// Creates the direct finger/cursor interaction.
+    private func zipperDrag(
+        travel: CGFloat
+    ) -> some Gesture {
+
+        DragGesture(
+            minimumDistance: 0
+        )
+        .onChanged { value in
+
+            viewModel.updateDrag(
+                translationY:
+                    value.translation.height,
+                zipperTravel:
+                    travel
+            )
+        }
+        .onEnded { _ in
+            viewModel.endDrag()
+        }
     }
 
     // MARK: - Controls
@@ -91,48 +141,6 @@ struct ZipperRevealView: View {
             HStack(
                 spacing: 14
             ) {
-
-                // MARK: Play / Pause
-
-                Button {
-
-                    viewModel.togglePlayback()
-
-                } label: {
-
-                    Image(
-                        systemName:
-                            viewModel.isPlaying
-                            ? "pause.fill"
-                            : "play.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 17,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        Color.white
-                    )
-                    .frame(
-                        width: 48,
-                        height: 48
-                    )
-                    .background(
-                        Circle()
-                            .fill(
-                                Color.white.opacity(0.08)
-                            )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                Color.white.opacity(0.18),
-                                lineWidth: 1
-                            )
-                    )
-                }
 
                 // MARK: Reset
 

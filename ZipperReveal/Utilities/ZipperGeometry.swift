@@ -2,7 +2,8 @@
 //  ZipperGeometry.swift
 //  ZipperReveal
 //
-//  Created by Z.K   on 11/09/2026.
+//  Created by Z.K  on 11/09/2026.
+//
 //  Geometry calculations used by the zipper animation.
 //
 
@@ -13,10 +14,12 @@ struct ZipperGeometry {
 
     // MARK: - Canvas
 
+    /// The complete size available to the zipper.
     let canvasSize: CGSize
 
     // MARK: - Configuration
 
+    /// Configuration containing all zipper dimensions.
     let configuration: ZipperConfiguration
 
     // MARK: - Canvas Center
@@ -104,12 +107,12 @@ struct ZipperGeometry {
 
     // MARK: - Slider
 
-    /// Slider width.
+    /// Width of the zipper slider.
     var sliderWidth: CGFloat {
         canvasSize.width * configuration.sliderWidthRatio
     }
 
-    /// Slider height.
+    /// Height of the zipper slider.
     var sliderHeight: CGFloat {
         canvasSize.height * configuration.sliderHeightRatio
     }
@@ -126,8 +129,8 @@ struct ZipperGeometry {
 
     /// Slider Y position based on animation progress.
     ///
-    /// 0 = top
-    /// 1 = bottom
+    /// 0 = completely closed.
+    /// 1 = completely opened.
     func sliderY(progress: CGFloat) -> CGFloat {
 
         let clampedProgress = progress.clamped(
@@ -136,12 +139,16 @@ struct ZipperGeometry {
         )
 
         return sliderTopY
-        + (sliderBottomY - sliderTopY) * clampedProgress
+            + (sliderBottomY - sliderTopY)
+            * clampedProgress
     }
 
     // MARK: - Fabric Separation
 
-    /// Current fabric separation.
+    /// Calculates how far the two fabric sides separate.
+    ///
+    /// 0 = fabric is closed.
+    /// 1 = fabric is completely separated.
     func fabricSeparation(progress: CGFloat) -> CGFloat {
 
         let clampedProgress = progress.clamped(
@@ -150,50 +157,71 @@ struct ZipperGeometry {
         )
 
         return canvasSize.width
-        * configuration.maximumFabricSeparationRatio
-        * clampedProgress
+            * configuration.maximumFabricSeparationRatio
+            * clampedProgress
     }
 
     // MARK: - Fabric Rectangles
 
-    /// Rectangle for the left fabric.
+    /// Rectangle representing the left fabric side.
     func leftFabricRect(progress: CGFloat) -> CGRect {
 
-        let separation = fabricSeparation(progress: progress)
+        let separation = fabricSeparation(
+            progress: progress
+        )
 
         let left = zipperLeft - separation
-        let right = centerX - centerTrackWidth / 2
+
+        let right =
+            centerX
+            - centerTrackWidth / 2
 
         return CGRect(
             x: left,
             y: zipperTop,
-            width: max(0, right - left),
+            width: Swift.max(
+                0,
+                right - left
+            ),
             height: zipperHeight
         )
     }
 
-    /// Rectangle for the right fabric.
+    /// Rectangle representing the right fabric side.
     func rightFabricRect(progress: CGFloat) -> CGRect {
 
-        let separation = fabricSeparation(progress: progress)
+        let separation = fabricSeparation(
+            progress: progress
+        )
 
-        let left = centerX + centerTrackWidth / 2
-        let right = zipperRight + separation
+        let left =
+            centerX
+            + centerTrackWidth / 2
+
+        let right =
+            zipperRight
+            + separation
 
         return CGRect(
             x: left,
             y: zipperTop,
-            width: max(0, right - left),
+            width: Swift.max(
+                0,
+                right - left
+            ),
             height: zipperHeight
         )
     }
 
     // MARK: - Opening Edges
 
-    /// Left opening edge.
+    /// Calculates the left edge of the opening.
     func leftOpeningPoint(progress: CGFloat) -> CGPoint {
 
-        let separation = fabricSeparation(progress: progress)
+        let separation =
+            fabricSeparation(
+                progress: progress
+            )
 
         let x =
             centerX
@@ -210,10 +238,13 @@ struct ZipperGeometry {
         )
     }
 
-    /// Right opening edge.
+    /// Calculates the right edge of the opening.
     func rightOpeningPoint(progress: CGFloat) -> CGPoint {
 
-        let separation = fabricSeparation(progress: progress)
+        let separation =
+            fabricSeparation(
+                progress: progress
+            )
 
         let x =
             centerX
@@ -230,35 +261,41 @@ struct ZipperGeometry {
         )
     }
 
-    /// Center point of the zipper slider.
+    // MARK: - Slider Center
+
+    /// Returns the exact center position of the zipper slider.
     func sliderCenter(progress: CGFloat) -> CGPoint {
 
         CGPoint(
             x: centerX,
-            y: sliderY(progress: progress)
+            y: sliderY(
+                progress: progress
+            )
         )
     }
 
     // MARK: - Teeth
 
-    /// Vertical distance between zipper teeth.
+    /// Vertical distance between individual zipper teeth.
     var toothSpacing: CGFloat {
 
         zipperHeight
-        / CGFloat(configuration.toothCount)
+            / CGFloat(
+                configuration.toothCount
+            )
     }
 
-    /// Returns the Y coordinate of a zipper tooth.
+    /// Returns the Y position of a zipper tooth.
     func toothY(index: Int) -> CGFloat {
 
         zipperTop
-        + CGFloat(index) * toothSpacing
-        + toothSpacing * 0.5
+            + CGFloat(index) * toothSpacing
+            + toothSpacing * 0.5
     }
 
     // MARK: - Utility
 
-    /// Creates a rounded rectangle path.
+    /// Creates a rounded rectangle Path.
     func roundedRectPath(
         rect: CGRect,
         cornerRadius: CGFloat
@@ -275,14 +312,17 @@ struct ZipperGeometry {
 
 extension CGFloat {
 
-    /// Restricts a CGFloat to a specified range.
+    /// Restricts the value to the specified range.
     func clamped(
         lowerBound: CGFloat,
         upperBound: CGFloat
     ) -> CGFloat {
 
-        min(
-            max(self, lowerBound),
+        Swift.min(
+            Swift.max(
+                self,
+                lowerBound
+            ),
             upperBound
         )
     }
