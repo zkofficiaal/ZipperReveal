@@ -30,6 +30,12 @@ struct ZipperCanvasView: View {
 
     var body: some View {
 
+        let currentProgress =
+            progress.clamped(
+                lowerBound: 0,
+                upperBound: 1
+            )
+
         GeometryReader { proxy in
 
             let size =
@@ -55,35 +61,47 @@ struct ZipperCanvasView: View {
                         configuration: configuration
                     )
 
-                // MARK: Closed / Opening / Fully Open
+                // MARK: Smooth Zipper Transition
 
-                if progress <= 0.001 {
+                // Keep the zipper fully visible while the user is opening it.
+                // Near the end, smoothly fade the zipper artwork away so the
+                // clean phone screen is revealed progressively instead of
+                // switching instantly at a hard threshold.
+                let zipperOpacity =
+                    smoothStepOpacity(
+                        progress: currentProgress,
+                        fadeStart: 0.82
+                    )
 
-                    // Completely closed: keep the original zipper artwork.
+                context.opacity =
+                    zipperOpacity
+
+                if currentProgress <= 0.001 {
+
                     drawClosedZipper(
                         context: &context,
                         geometry: geometry
                     )
 
-                } else if progress < 0.98 {
+                } else {
 
-                    // Opening: keep the existing V-shaped zipper artwork.
                     drawOpeningZipper(
                         context: &context,
                         geometry: geometry,
-                        progress: progress
+                        progress: currentProgress
                     )
                 }
 
                 // MARK: Slider
 
-                // Keep the slider visible while the zipper opens.
-                // At the fully-open position the fabric, rails, and teeth
-                // disappear, leaving the clean phone screen underneath.
+                // The slider stays visible and follows the finger all the
+                // way to the bottom. Only the zipper/fabric artwork fades.
+                context.opacity = 1
+
                 drawSlider(
                     context: &context,
                     geometry: geometry,
-                    progress: progress
+                    progress: currentProgress
                 )
             }
 
@@ -143,38 +161,45 @@ struct ZipperCanvasView: View {
         progress: CGFloat
     ) {
 
-        let p = progress.clamped(lowerBound: 0, upperBound: 1)
+        let leftRect =
+            geometry.leftFabricRect(
+                progress: progress
+            )
 
-        // MARK: Left V-Shaped Fabric
+        let rightRect =
+            geometry.rightFabricRect(
+                progress: progress
+            )
 
-        drawVFabric(
+        // MARK: Left Fabric
+
+        drawFabric(
             context: &context,
             geometry: geometry,
-            points: geometry.leftFabricPathPoints(progress: p)
+            rect: leftRect
         )
 
-        // MARK: Right V-Shaped Fabric
+        // MARK: Right Fabric
 
-        drawVFabric(
+        drawFabric(
             context: &context,
             geometry: geometry,
-            points: geometry.rightFabricPathPoints(progress: p)
+            rect: rightRect
         )
 
-        // MARK: V Rails
+        // MARK: Opening Edges
 
         drawOpeningEdges(
             context: &context,
             geometry: geometry,
-            progress: p
+            progress: progress
         )
 
         // MARK: Center Tape
 
         drawCenterTape(
             context: &context,
-            geometry: geometry,
-            startY: geometry.sliderY(progress: p)
+            geometry: geometry
         )
 
         // MARK: Teeth
@@ -182,57 +207,7 @@ struct ZipperCanvasView: View {
         drawTeeth(
             context: &context,
             geometry: geometry,
-            progress: p
-        )
-    }
-
-    // MARK: - V Fabric
-
-    private func drawVFabric(
-        context: inout GraphicsContext,
-        geometry: ZipperGeometry,
-        points: [CGPoint]
-    ) {
-
-        guard points.count >= 3 else {
-            return
-        }
-
-        var path = Path()
-        path.move(to: points[0])
-
-        for point in points.dropFirst() {
-            path.addLine(to: point)
-        }
-
-        path.closeSubpath()
-
-        context.fill(
-            path,
-            with: .color(Color.black.opacity(0.98))
-        )
-
-        // Preserve the existing fabric detail, but clip it to the
-        // V-shaped panel so the grid/stitching never draws inside the opening.
-        var clippedContext = context
-        clippedContext.clip(to: path)
-
-        let bounds = path.boundingRect
-
-        drawFabricGrid(
-            context: &clippedContext,
-            rect: bounds
-        )
-
-        drawDiamondStitching(
-            context: &clippedContext,
-            rect: bounds
-        )
-
-        context.stroke(
-            path,
-            with: .color(Color.white.opacity(0.72)),
-            lineWidth: 1.15
+            progress: progress
         )
     }
 
@@ -554,61 +529,103 @@ struct ZipperCanvasView: View {
         progress: CGFloat
     ) {
 
-        let p = progress.clamped(lowerBound: 0, upperBound: 1)
-        let slider = geometry.sliderCenter(progress: p)
+        let leftPoint =
+            geometry.leftOpeningPoint(
+                progress: progress
+            )
 
-        // Left side of the V.
-        var leftPath = Path()
+        let rightPoint =
+            geometry.rightOpeningPoint(
+                progress: progress
+            )
+
+        let sliderPoint =
+            geometry.sliderCenter(
+                progress: progress
+            )
+
+        // Left opening path.
+        var leftPath =
+            Path()
+
         leftPath.move(
             to: CGPoint(
-                x: geometry.topLeftRailX,
+                x: geometry.centerX
+                    - geometry.centerTrackWidth / 2,
                 y: geometry.zipperTop
             )
         )
-        leftPath.addLine(to: slider)
+
+        leftPath.addQuadCurve(
+            to: sliderPoint,
+            control: CGPoint(
+                x: geometry.centerX
+                    - geometry.zipperWidth * 0.19,
+                y: geometry.zipperTop
+                    + geometry.zipperHeight * 0.40
+            )
+        )
 
         context.stroke(
             leftPath,
-            with: .color(Color.white.opacity(0.78)),
-            lineWidth: 1.1
+            with: .color(
+                Color.white.opacity(0.75)
+            ),
+            lineWidth: 1.0
         )
 
-        // Right side of the V.
-        var rightPath = Path()
+        // Right opening path.
+        var rightPath =
+            Path()
+
         rightPath.move(
             to: CGPoint(
-                x: geometry.topRightRailX,
+                x: geometry.centerX
+                    + geometry.centerTrackWidth / 2,
                 y: geometry.zipperTop
             )
         )
-        rightPath.addLine(to: slider)
+
+        rightPath.addQuadCurve(
+            to: sliderPoint,
+            control: CGPoint(
+                x: geometry.centerX
+                    + geometry.zipperWidth * 0.19,
+                y: geometry.zipperTop
+                    + geometry.zipperHeight * 0.40
+            )
+        )
 
         context.stroke(
             rightPath,
-            with: .color(Color.white.opacity(0.78)),
-            lineWidth: 1.1
+            with: .color(
+                Color.white.opacity(0.75)
+            ),
+            lineWidth: 1.0
         )
 
-        // Dark depth line follows the same V so the opening reads as a real gap.
-        var shadow = Path()
+        // Small dark shadow directly behind opening.
+        var shadow =
+            Path()
+
         shadow.move(
-            to: CGPoint(
-                x: geometry.centerTrackLeft,
-                y: geometry.zipperTop
-            )
+            to: leftPoint
         )
-        shadow.addLine(to: slider)
+
         shadow.addLine(
-            to: CGPoint(
-                x: geometry.centerTrackRight,
-                y: geometry.zipperTop
-            )
+            to: sliderPoint
+        )
+
+        shadow.addLine(
+            to: rightPoint
         )
 
         context.stroke(
             shadow,
-            with: .color(Color.black.opacity(0.70)),
-            lineWidth: 3.0
+            with: .color(
+                Color.black.opacity(0.65)
+            ),
+            lineWidth: 3
         )
     }
 
@@ -616,23 +633,15 @@ struct ZipperCanvasView: View {
 
     private func drawCenterTape(
         context: inout GraphicsContext,
-        geometry: ZipperGeometry,
-        startY: CGFloat? = nil
+        geometry: ZipperGeometry
     ) {
-
-        let topY = startY ?? geometry.zipperTop
-        let tapeHeight = Swift.max(geometry.zipperBottom - topY, 0)
-
-        guard tapeHeight > 0 else {
-            return
-        }
 
         let rect =
             CGRect(
                 x: geometry.centerTrackLeft,
-                y: topY,
+                y: geometry.zipperTop,
                 width: geometry.centerTrackWidth,
-                height: tapeHeight
+                height: geometry.zipperHeight
             )
 
         // Outer dark tape.
@@ -707,27 +716,49 @@ struct ZipperCanvasView: View {
             geometry.canvasSize.height
             * configuration.toothHeightRatio
 
-        let p = progress.clamped(lowerBound: 0, upperBound: 1)
-
         for index in 0..<configuration.toothCount {
 
-            let y = geometry.toothY(index: index)
+            let y =
+                geometry.toothY(
+                    index: index
+                )
 
-            let leftX = geometry.toothX(
-                side: -1,
-                y: y,
-                progress: p
-            )
+            // During the opening, lower teeth remain visually
+            // attached to the slider region while upper teeth
+            // form the open rails.
+            let normalizedY =
+                CGFloat(index)
+                / CGFloat(
+                    max(
+                        configuration.toothCount - 1,
+                        1
+                    )
+                )
 
-            let rightX = geometry.toothX(
-                side: 1,
-                y: y,
-                progress: p
-            )
+            let openingThreshold =
+                progress
+
+            let sideOffset: CGFloat
+
+            if normalizedY < openingThreshold {
+
+                sideOffset =
+                    geometry.fabricSeparation(
+                        progress: progress
+                    )
+                    * normalizedY
+                    * 0.32
+
+            } else {
+
+                sideOffset = 0
+            }
 
             drawTooth(
                 context: &context,
-                x: leftX,
+                x: geometry.centerX
+                    - geometry.centerTrackWidth * 0.40
+                    - sideOffset,
                 y: y,
                 width: toothWidth,
                 height: toothHeight
@@ -735,7 +766,9 @@ struct ZipperCanvasView: View {
 
             drawTooth(
                 context: &context,
-                x: rightX,
+                x: geometry.centerX
+                    + geometry.centerTrackWidth * 0.40
+                    + sideOffset,
                 y: y,
                 width: toothWidth,
                 height: toothHeight
@@ -994,4 +1027,35 @@ struct ZipperCanvasView: View {
             lineWidth: 0.8
         )
     }
+
+    // MARK: - Smooth Transition
+
+    /// Returns a smooth 1...0 opacity value as progress moves from
+    /// `fadeStart` to 1.
+    ///
+    /// Smoothstep avoids a sudden visual jump at the end of the zipper
+    /// interaction.
+    private func smoothStepOpacity(
+        progress: CGFloat,
+        fadeStart: CGFloat
+    ) -> CGFloat {
+
+        let normalized =
+            (progress - fadeStart)
+            / (1 - fadeStart)
+
+        let clamped =
+            normalized.clamped(
+                lowerBound: 0,
+                upperBound: 1
+            )
+
+        let eased =
+            clamped
+            * clamped
+            * (3 - 2 * clamped)
+
+        return 1 - eased
+    }
+
 }

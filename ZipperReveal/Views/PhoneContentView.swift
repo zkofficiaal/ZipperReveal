@@ -24,39 +24,22 @@ struct PhoneContentView: View {
             let size =
                 proxy.size
 
+            // The content fills the available screen.
+            // The simulator/device frame is already outside this view,
+            // so we do not draw a second phone frame inside the screen.
             let phoneWidth =
                 size.width
-                * configuration.phoneWidthRatio
 
             let phoneHeight =
                 size.height
-                * configuration.phoneHeightRatio
 
             ZStack {
 
-                // MARK: Phone Body
+                // MARK: Screen
 
-                RoundedRectangle(
-                    cornerRadius:
-                        size.width
-                        * configuration.phoneCornerRadiusRatio
-                )
-                .fill(
-                    Color.black
-                )
+                Color.black
 
-                // MARK: Phone Border
-
-                RoundedRectangle(
-                    cornerRadius:
-                        size.width
-                        * configuration.phoneCornerRadiusRatio
-                )
-                .stroke(
-                    Color.white
-                        .opacity(0.85),
-                    lineWidth: 1.4
-                )
+                    .ignoresSafeArea()
 
                 // MARK: Dynamic Island
 
@@ -65,7 +48,7 @@ struct PhoneContentView: View {
                         Color.black
                     )
                     .frame(
-                        width: phoneWidth * 0.28,
+                        width: phoneWidth * 0.16,
                         height: phoneHeight * 0.035
                     )
                     .offset(
@@ -75,22 +58,18 @@ struct PhoneContentView: View {
                 // MARK: Hello World
 
                 Text("Hello\nworld!")
-
                     .font(
                         .system(
-                            size: phoneWidth * 0.115,
+                            size: phoneWidth * 0.080,
                             weight: .bold
                         )
                     )
-
                     .foregroundStyle(
                         Color.white
                     )
-
                     .multilineTextAlignment(
                         .center
                     )
-
                     .lineSpacing(
                         -2
                     )
@@ -105,15 +84,9 @@ struct PhoneContentView: View {
                     y: phoneHeight * 0.39
                 )
             }
-
             .frame(
                 width: phoneWidth,
                 height: phoneHeight
-            )
-
-            .position(
-                x: size.width / 2,
-                y: size.height / 2
             )
         }
     }
@@ -166,7 +139,6 @@ struct PhoneContentView: View {
                 x: phoneWidth * 0.012
             )
         }
-
         .frame(
             width: phoneWidth * 0.10,
             height: phoneHeight * 0.11
