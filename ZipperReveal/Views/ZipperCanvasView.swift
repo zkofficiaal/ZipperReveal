@@ -161,83 +161,124 @@ struct ZipperCanvasView: View {
                 upperBound: 1
             )
 
-        let separation =
-            geometry.fabricSeparation(
-                progress: p
-            )
-
-        let leftEdge =
-            geometry.zipperLeft - separation
-
-        let rightEdge =
-            geometry.centerX
-            - geometry.centerTrackWidth / 2
-
-        let leftRect =
-            CGRect(
-                x: leftEdge,
-                y: geometry.zipperTop,
-                width: Swift.max(
-                    0,
-                    rightEdge - leftEdge
-                ),
-                height: geometry.zipperHeight
-            )
-
-        let rightEdgeStart =
-            geometry.centerX
-            + geometry.centerTrackWidth / 2
-
-        let rightRect =
-            CGRect(
-                x: rightEdgeStart,
-                y: geometry.zipperTop,
-                width: Swift.max(
-                    0,
-                    geometry.zipperRight
-                    + separation
-                    - rightEdgeStart
-                ),
-                height: geometry.zipperHeight
-            )
-
-        // MARK: Left Fabric
-
-        drawFabric(
+        // The opened fabric is a true V shape.
+        // Its inner edge starts wide at the top and converges
+        // exactly to the slider.
+        drawVFabric(
             context: &context,
             geometry: geometry,
-            rect: leftRect
+            progress: p,
+            side: .left
         )
 
-        // MARK: Right Fabric
-
-        drawFabric(
+        drawVFabric(
             context: &context,
             geometry: geometry,
-            rect: rightRect
+            progress: p,
+            side: .right
         )
 
-        // MARK: Opening Edges
-
+        // The two zipper rails follow the same V geometry.
         drawOpeningEdges(
             context: &context,
             geometry: geometry,
             progress: p
         )
 
-        // MARK: Center Tape
-
+        // Only the zipper tape below the slider remains visible.
         drawCenterTape(
             context: &context,
-            geometry: geometry
+            geometry: geometry,
+            startY: geometry.sliderY(progress: p)
         )
 
-        // MARK: Teeth
-
+        // Teeth are positioned directly on the V rails.
         drawTeeth(
             context: &context,
             geometry: geometry,
             progress: p
+        )
+    }
+
+    // MARK: - V Fabric
+
+    private enum VFabricSide {
+        case left
+        case right
+    }
+
+    private func drawVFabric(
+        context: inout GraphicsContext,
+        geometry: ZipperGeometry,
+        progress: CGFloat,
+        side: VFabricSide
+    ) {
+
+        let points =
+            side == .left
+            ? geometry.leftFabricPathPoints(progress: progress)
+            : geometry.rightFabricPathPoints(progress: progress)
+
+        guard points.count >= 5 else {
+            return
+        }
+
+        var fabricPath =
+            Path()
+
+        fabricPath.move(
+            to: points[0]
+        )
+
+        for point in points.dropFirst() {
+            fabricPath.addLine(
+                to: point
+            )
+        }
+
+        fabricPath.closeSubpath()
+
+        context.fill(
+            fabricPath,
+            with: .color(
+                Color.black.opacity(0.98)
+            )
+        )
+
+        // Clip the existing fabric texture to the V panel.
+        context.drawLayer { layer in
+
+            layer.clip(
+                to: fabricPath
+            )
+
+            let bounds =
+                CGRect(
+                    x: geometry.zipperLeft
+                        - geometry.fabricSeparation(progress: progress),
+                    y: geometry.zipperTop,
+                    width: geometry.zipperWidth
+                        + geometry.fabricSeparation(progress: progress) * 2,
+                    height: geometry.zipperHeight
+                )
+
+            drawFabricGrid(
+                context: &layer,
+                rect: bounds
+            )
+
+            drawDiamondStitching(
+                context: &layer,
+                rect: bounds
+            )
+        }
+
+        context.stroke(
+            fabricPath,
+            with: .color(
+                Color.white.opacity(0.72)
+            ),
+            lineWidth: 1.15
         )
     }
 
@@ -559,101 +600,88 @@ struct ZipperCanvasView: View {
         progress: CGFloat
     ) {
 
-        let leftPoint =
-            geometry.leftOpeningPoint(
-                progress: progress
+        let leftTop =
+            CGPoint(
+                x: geometry.topLeftRailX,
+                y: geometry.zipperTop
             )
 
-        let rightPoint =
-            geometry.rightOpeningPoint(
-                progress: progress
+        let rightTop =
+            CGPoint(
+                x: geometry.topRightRailX,
+                y: geometry.zipperTop
             )
 
-        let sliderPoint =
+        let slider =
             geometry.sliderCenter(
                 progress: progress
             )
 
-        // Left opening path.
+        // Left V rail.
         var leftPath =
             Path()
 
         leftPath.move(
-            to: CGPoint(
-                x: geometry.centerX
-                    - geometry.centerTrackWidth / 2,
-                y: geometry.zipperTop
-            )
+            to: leftTop
         )
 
-        leftPath.addQuadCurve(
-            to: sliderPoint,
-            control: CGPoint(
-                x: geometry.centerX
-                    - geometry.zipperWidth * 0.19,
-                y: geometry.zipperTop
-                    + geometry.zipperHeight * 0.40
-            )
+        leftPath.addLine(
+            to: slider
         )
 
         context.stroke(
             leftPath,
             with: .color(
-                Color.white.opacity(0.75)
+                Color.white.opacity(0.82)
             ),
-            lineWidth: 1.0
+            lineWidth: 1.1
         )
 
-        // Right opening path.
+        // Right V rail.
         var rightPath =
             Path()
 
         rightPath.move(
-            to: CGPoint(
-                x: geometry.centerX
-                    + geometry.centerTrackWidth / 2,
-                y: geometry.zipperTop
-            )
+            to: rightTop
         )
 
-        rightPath.addQuadCurve(
-            to: sliderPoint,
-            control: CGPoint(
-                x: geometry.centerX
-                    + geometry.zipperWidth * 0.19,
-                y: geometry.zipperTop
-                    + geometry.zipperHeight * 0.40
-            )
+        rightPath.addLine(
+            to: slider
         )
 
         context.stroke(
             rightPath,
             with: .color(
-                Color.white.opacity(0.75)
+                Color.white.opacity(0.82)
             ),
-            lineWidth: 1.0
+            lineWidth: 1.1
         )
 
-        // Small dark shadow directly behind opening.
+        // Dark shadow follows both rails to give the zipper
+        // the same depth as the reference.
         var shadow =
             Path()
 
         shadow.move(
-            to: leftPoint
+            to: leftTop
         )
 
         shadow.addLine(
-            to: sliderPoint
+            to: slider
+        )
+
+        shadow.move(
+            to: rightTop
         )
 
         shadow.addLine(
-            to: rightPoint
+            to: slider
         )
 
         context.stroke(
             shadow,
             with: .color(
-                Color.black.opacity(0.65)
+                Color.black.opacity(0.62)
             ),
             lineWidth: 3
         )
@@ -663,15 +691,16 @@ struct ZipperCanvasView: View {
 
     private func drawCenterTape(
         context: inout GraphicsContext,
-        geometry: ZipperGeometry
+        geometry: ZipperGeometry,
+        startY: CGFloat? = nil
     ) {
 
         let rect =
             CGRect(
                 x: geometry.centerTrackLeft,
-                y: geometry.zipperTop,
+                y: startY ?? geometry.zipperTop,
                 width: geometry.centerTrackWidth,
-                height: geometry.zipperHeight
+                height: geometry.zipperBottom - (startY ?? geometry.zipperTop)
             )
 
         // Outer dark tape.
@@ -753,42 +782,23 @@ struct ZipperCanvasView: View {
                     index: index
                 )
 
-            // During the opening, lower teeth remain visually
-            // attached to the slider region while upper teeth
-            // form the open rails.
-            let normalizedY =
-                CGFloat(index)
-                / CGFloat(
-                    max(
-                        configuration.toothCount - 1,
-                        1
-                    )
+            let leftX =
+                geometry.toothX(
+                    side: -1,
+                    y: y,
+                    progress: progress
                 )
 
-            let openingThreshold =
-                progress
-
-            let sideOffset: CGFloat
-
-            if normalizedY < openingThreshold {
-
-                sideOffset =
-                    geometry.fabricSeparation(
-                        progress: progress
-                    )
-                    * normalizedY
-                    * 0.32
-
-            } else {
-
-                sideOffset = 0
-            }
+            let rightX =
+                geometry.toothX(
+                    side: 1,
+                    y: y,
+                    progress: progress
+                )
 
             drawTooth(
                 context: &context,
-                x: geometry.centerX
-                    - geometry.centerTrackWidth * 0.40
-                    - sideOffset,
+                x: leftX,
                 y: y,
                 width: toothWidth,
                 height: toothHeight
@@ -796,9 +806,7 @@ struct ZipperCanvasView: View {
 
             drawTooth(
                 context: &context,
-                x: geometry.centerX
-                    + geometry.centerTrackWidth * 0.40
-                    + sideOffset,
+                x: rightX,
                 y: y,
                 width: toothWidth,
                 height: toothHeight
