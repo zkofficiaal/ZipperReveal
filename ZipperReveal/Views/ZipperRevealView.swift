@@ -3,7 +3,6 @@
 //  ZipperReveal
 //
 //  Created by Z.K   on 11/09/2026.
-
 //  Main screen for the zipper reveal animation.
 //
 

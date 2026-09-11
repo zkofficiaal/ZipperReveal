@@ -2,6 +2,7 @@
 //  ZipperConfiguration.swift
 //  ZipperReveal
 //
+//  Created by Z.K   on 11/09/2026.
 //  Central configuration for the zipper reveal animation.
 //
 

@@ -2,6 +2,7 @@
 //  ZipperPhase.swift
 //  ZipperReveal
 //
+//  Created by Z.K   on 11/09/2026.
 //  Defines the current phase of the zipper animation.
 //
 
