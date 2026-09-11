@@ -41,12 +41,6 @@ struct ZipperCanvasView: View {
             let size =
                 proxy.size
 
-            let geometry =
-                ZipperGeometry(
-                    canvasSize: size,
-                    configuration: configuration
-                )
-
             Canvas(
                 opaque: false,
                 colorMode: .linear,
@@ -161,14 +155,50 @@ struct ZipperCanvasView: View {
         progress: CGFloat
     ) {
 
-        let leftRect =
-            geometry.leftFabricRect(
-                progress: progress
+        let p =
+            progress.clamped(
+                lowerBound: 0,
+                upperBound: 1
             )
 
+        let separation =
+            geometry.fabricSeparation(
+                progress: p
+            )
+
+        let leftEdge =
+            geometry.zipperLeft - separation
+
+        let rightEdge =
+            geometry.centerX
+            - geometry.centerTrackWidth / 2
+
+        let leftRect =
+            CGRect(
+                x: leftEdge,
+                y: geometry.zipperTop,
+                width: Swift.max(
+                    0,
+                    rightEdge - leftEdge
+                ),
+                height: geometry.zipperHeight
+            )
+
+        let rightEdgeStart =
+            geometry.centerX
+            + geometry.centerTrackWidth / 2
+
         let rightRect =
-            geometry.rightFabricRect(
-                progress: progress
+            CGRect(
+                x: rightEdgeStart,
+                y: geometry.zipperTop,
+                width: Swift.max(
+                    0,
+                    geometry.zipperRight
+                    + separation
+                    - rightEdgeStart
+                ),
+                height: geometry.zipperHeight
             )
 
         // MARK: Left Fabric
@@ -192,7 +222,7 @@ struct ZipperCanvasView: View {
         drawOpeningEdges(
             context: &context,
             geometry: geometry,
-            progress: progress
+            progress: p
         )
 
         // MARK: Center Tape
@@ -207,7 +237,7 @@ struct ZipperCanvasView: View {
         drawTeeth(
             context: &context,
             geometry: geometry,
-            progress: progress
+            progress: p
         )
     }
 

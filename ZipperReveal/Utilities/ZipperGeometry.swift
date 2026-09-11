@@ -67,20 +67,7 @@ struct ZipperGeometry {
     /// Half the distance between the two rails at the top of the V.
     /// Increase this value to make the V wider.
     var topRailHalfWidth: CGFloat {
-        // Keep the V opening wide enough to reveal the phone underneath.
-        // The phone is centered, so the opening must be at least half
-        // the phone width on each side at the top of the V.
-        let phoneHalfWidth = phoneWidth / 2
-        let minimumRailHalfWidth = phoneHalfWidth + centerTrackWidth / 2
-        let configuredRailHalfWidth = zipperWidth * 0.12
-
-        return Swift.min(
-            zipperWidth / 2 - centerTrackWidth,
-            Swift.max(
-                configuredRailHalfWidth,
-                minimumRailHalfWidth
-            )
-        )
+        zipperWidth * 0.30
     }
 
     var topLeftRailX: CGFloat {
