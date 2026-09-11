@@ -4,49 +4,40 @@
 //
 //  Created by Z.K  on 11/09/2026.
 //
-//  Geometry calculations used by the zipper animation.
+//  Geometry calculations used by the zipper reveal.
 //
 
 import SwiftUI
 
-/// Contains geometry calculations for the zipper reveal.
+/// Contains all geometry calculations used by the zipper reveal.
+///
+/// The opening is V-shaped: the two zipper rails start apart near the
+/// top and converge toward the slider as the user drags downward.
 struct ZipperGeometry {
 
     // MARK: - Canvas
 
-    /// The complete size available to the zipper.
     let canvasSize: CGSize
 
     // MARK: - Configuration
 
-    /// Configuration containing all zipper dimensions.
     let configuration: ZipperConfiguration
 
     // MARK: - Canvas Center
 
-    /// Horizontal center of the canvas.
-    var centerX: CGFloat {
-        canvasSize.width / 2
-    }
-
-    /// Vertical center of the canvas.
-    var centerY: CGFloat {
-        canvasSize.height / 2
-    }
+    var centerX: CGFloat { canvasSize.width / 2 }
+    var centerY: CGFloat { canvasSize.height / 2 }
 
     // MARK: - Phone
 
-    /// Width of the phone.
     var phoneWidth: CGFloat {
         canvasSize.width * configuration.phoneWidthRatio
     }
 
-    /// Height of the phone.
     var phoneHeight: CGFloat {
         canvasSize.height * configuration.phoneHeightRatio
     }
 
-    /// Rectangle containing the phone.
     var phoneRect: CGRect {
         CGRect(
             x: centerX - phoneWidth / 2,
@@ -58,253 +49,219 @@ struct ZipperGeometry {
 
     // MARK: - Zipper
 
-    /// Total zipper width.
     var zipperWidth: CGFloat {
         canvasSize.width * configuration.zipperWidthRatio
     }
 
-    /// Total zipper height.
     var zipperHeight: CGFloat {
         canvasSize.height * configuration.zipperHeightRatio
     }
 
-    /// Top edge of the zipper.
-    var zipperTop: CGFloat {
-        centerY - zipperHeight / 2
+    var zipperTop: CGFloat { centerY - zipperHeight / 2 }
+    var zipperBottom: CGFloat { zipperTop + zipperHeight }
+    var zipperLeft: CGFloat { centerX - zipperWidth / 2 }
+    var zipperRight: CGFloat { centerX + zipperWidth / 2 }
+
+    // MARK: - V Shape
+
+    /// Half the distance between the two rails at the top of the V.
+    /// Increase this value to make the V wider.
+    var topRailHalfWidth: CGFloat {
+        // Keep the V opening wide enough to reveal the phone underneath.
+        // The phone is centered, so the opening must be at least half
+        // the phone width on each side at the top of the V.
+        let phoneHalfWidth = phoneWidth / 2
+        let minimumRailHalfWidth = phoneHalfWidth + centerTrackWidth / 2
+        let configuredRailHalfWidth = zipperWidth * 0.12
+
+        return Swift.min(
+            zipperWidth / 2 - centerTrackWidth,
+            Swift.max(
+                configuredRailHalfWidth,
+                minimumRailHalfWidth
+            )
+        )
     }
 
-    /// Bottom edge of the zipper.
-    var zipperBottom: CGFloat {
-        zipperTop + zipperHeight
+    var topLeftRailX: CGFloat {
+        centerX - topRailHalfWidth
     }
 
-    /// Left edge of the zipper.
-    var zipperLeft: CGFloat {
-        centerX - zipperWidth / 2
+    var topRightRailX: CGFloat {
+        centerX + topRailHalfWidth
     }
 
-    /// Right edge of the zipper.
-    var zipperRight: CGFloat {
-        centerX + zipperWidth / 2
+    /// Y coordinate where the V opening reaches the slider.
+    func openingY(progress: CGFloat) -> CGFloat {
+        sliderY(progress: progress)
+    }
+
+    /// X coordinate of the left V rail at a given Y position.
+    func leftRailX(at y: CGFloat, progress: CGFloat) -> CGFloat {
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
+        let sliderY = openingY(progress: p)
+
+        guard y <= sliderY else {
+            return centerTrackLeft
+        }
+
+        let denominator = Swift.max(sliderY - zipperTop, 0.001)
+        let t = ((y - zipperTop) / denominator)
+            .clamped(lowerBound: 0, upperBound: 1)
+
+        return topLeftRailX
+            + (centerX - topLeftRailX) * t
+    }
+
+    /// X coordinate of the right V rail at a given Y position.
+    func rightRailX(at y: CGFloat, progress: CGFloat) -> CGFloat {
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
+        let sliderY = openingY(progress: p)
+
+        guard y <= sliderY else {
+            return centerTrackRight
+        }
+
+        let denominator = Swift.max(sliderY - zipperTop, 0.001)
+        let t = ((y - zipperTop) / denominator)
+            .clamped(lowerBound: 0, upperBound: 1)
+
+        return topRightRailX
+            + (centerX - topRightRailX) * t
     }
 
     // MARK: - Center Track
 
-    /// Width of the center zipper track.
     var centerTrackWidth: CGFloat {
         canvasSize.width * configuration.centerTrackWidthRatio
     }
 
-    /// Left edge of center track.
     var centerTrackLeft: CGFloat {
         centerX - centerTrackWidth / 2
     }
 
-    /// Right edge of center track.
     var centerTrackRight: CGFloat {
         centerX + centerTrackWidth / 2
     }
 
     // MARK: - Slider
 
-    /// Width of the zipper slider.
     var sliderWidth: CGFloat {
         canvasSize.width * configuration.sliderWidthRatio
     }
 
-    /// Height of the zipper slider.
     var sliderHeight: CGFloat {
         canvasSize.height * configuration.sliderHeightRatio
     }
 
-    /// Top slider position.
     var sliderTopY: CGFloat {
         zipperTop + sliderHeight * 0.35
     }
 
-    /// Bottom slider position.
     var sliderBottomY: CGFloat {
         zipperBottom - sliderHeight * 0.80
     }
 
-    /// Slider Y position based on animation progress.
-    ///
-    /// 0 = completely closed.
-    /// 1 = completely opened.
     func sliderY(progress: CGFloat) -> CGFloat {
-
-        let clampedProgress = progress.clamped(
-            lowerBound: 0,
-            upperBound: 1
-        )
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
 
         return sliderTopY
-            + (sliderBottomY - sliderTopY)
-            * clampedProgress
+            + (sliderBottomY - sliderTopY) * p
     }
 
     // MARK: - Fabric Separation
 
-    /// Calculates how far the two fabric sides separate.
-    ///
-    /// 0 = fabric is closed.
-    /// 1 = fabric is completely separated.
+    /// Moves the outside fabric edges slightly outward while the V opening grows.
     func fabricSeparation(progress: CGFloat) -> CGFloat {
-
-        let clampedProgress = progress.clamped(
-            lowerBound: 0,
-            upperBound: 1
-        )
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
 
         return canvasSize.width
             * configuration.maximumFabricSeparationRatio
-            * clampedProgress
+            * p
     }
 
-    // MARK: - Fabric Rectangles
+    // MARK: - Fabric Paths
 
-    /// Rectangle representing the left fabric side.
-    func leftFabricRect(progress: CGFloat) -> CGRect {
+    /// Points for the left fabric panel. The inner edge follows the V rail.
+    func leftFabricPathPoints(progress: CGFloat) -> [CGPoint] {
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
+        let sliderY = openingY(progress: p)
+        let outerLeft = zipperLeft - fabricSeparation(progress: p)
 
-        let separation = fabricSeparation(
-            progress: progress
-        )
-
-        let left = zipperLeft - separation
-
-        let right =
-            centerX
-            - centerTrackWidth / 2
-
-        return CGRect(
-            x: left,
-            y: zipperTop,
-            width: Swift.max(
-                0,
-                right - left
-            ),
-            height: zipperHeight
-        )
+        return [
+            CGPoint(x: outerLeft, y: zipperTop),
+            CGPoint(x: outerLeft, y: zipperBottom),
+            CGPoint(x: centerTrackLeft, y: zipperBottom),
+            CGPoint(x: centerTrackLeft, y: sliderY),
+            CGPoint(x: topLeftRailX, y: zipperTop)
+        ]
     }
 
-    /// Rectangle representing the right fabric side.
-    func rightFabricRect(progress: CGFloat) -> CGRect {
+    /// Points for the right fabric panel. The inner edge follows the V rail.
+    func rightFabricPathPoints(progress: CGFloat) -> [CGPoint] {
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
+        let sliderY = openingY(progress: p)
+        let outerRight = zipperRight + fabricSeparation(progress: p)
 
-        let separation = fabricSeparation(
-            progress: progress
-        )
-
-        let left =
-            centerX
-            + centerTrackWidth / 2
-
-        let right =
-            zipperRight
-            + separation
-
-        return CGRect(
-            x: left,
-            y: zipperTop,
-            width: Swift.max(
-                0,
-                right - left
-            ),
-            height: zipperHeight
-        )
+        return [
+            CGPoint(x: outerRight, y: zipperTop),
+            CGPoint(x: outerRight, y: zipperBottom),
+            CGPoint(x: centerTrackRight, y: zipperBottom),
+            CGPoint(x: centerTrackRight, y: sliderY),
+            CGPoint(x: topRightRailX, y: zipperTop)
+        ]
     }
 
     // MARK: - Opening Edges
 
-    /// Calculates the left edge of the opening.
     func leftOpeningPoint(progress: CGFloat) -> CGPoint {
-
-        let separation =
-            fabricSeparation(
-                progress: progress
-            )
-
-        let x =
-            centerX
-            - centerTrackWidth / 2
-            - separation
-
-        let y =
-            zipperTop
-            + zipperHeight * progress
-
-        return CGPoint(
-            x: x,
-            y: y
-        )
+        CGPoint(x: topLeftRailX, y: zipperTop)
     }
 
-    /// Calculates the right edge of the opening.
     func rightOpeningPoint(progress: CGFloat) -> CGPoint {
-
-        let separation =
-            fabricSeparation(
-                progress: progress
-            )
-
-        let x =
-            centerX
-            + centerTrackWidth / 2
-            + separation
-
-        let y =
-            zipperTop
-            + zipperHeight * progress
-
-        return CGPoint(
-            x: x,
-            y: y
-        )
+        CGPoint(x: topRightRailX, y: zipperTop)
     }
 
     // MARK: - Slider Center
 
-    /// Returns the exact center position of the zipper slider.
     func sliderCenter(progress: CGFloat) -> CGPoint {
-
-        CGPoint(
-            x: centerX,
-            y: sliderY(
-                progress: progress
-            )
-        )
+        CGPoint(x: centerX, y: sliderY(progress: progress))
     }
 
     // MARK: - Teeth
 
-    /// Vertical distance between individual zipper teeth.
     var toothSpacing: CGFloat {
-
-        zipperHeight
-            / CGFloat(
-                configuration.toothCount
-            )
+        zipperHeight / CGFloat(configuration.toothCount)
     }
 
-    /// Returns the Y position of a zipper tooth.
     func toothY(index: Int) -> CGFloat {
-
         zipperTop
             + CGFloat(index) * toothSpacing
             + toothSpacing * 0.5
     }
 
+    /// X coordinate of a tooth on either side of the V-shaped opening.
+    func toothX(side: CGFloat, y: CGFloat, progress: CGFloat) -> CGFloat {
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
+        let sliderY = openingY(progress: p)
+
+        if y <= sliderY {
+            let denominator = Swift.max(sliderY - zipperTop, 0.001)
+            let t = ((y - zipperTop) / denominator)
+                .clamped(lowerBound: 0, upperBound: 1)
+
+            let topX = side < 0 ? topLeftRailX : topRightRailX
+
+            return topX + (centerX - topX) * t
+        }
+
+        return side < 0 ? centerTrackLeft : centerTrackRight
+    }
+
     // MARK: - Utility
 
-    /// Creates a rounded rectangle Path.
-    func roundedRectPath(
-        rect: CGRect,
-        cornerRadius: CGFloat
-    ) -> Path {
-
-        Path(
-            roundedRect: rect,
-            cornerRadius: cornerRadius
-        )
+    func roundedRectPath(rect: CGRect, cornerRadius: CGFloat) -> Path {
+        Path(roundedRect: rect, cornerRadius: cornerRadius)
     }
 }
 
@@ -312,17 +269,12 @@ struct ZipperGeometry {
 
 extension CGFloat {
 
-    /// Restricts the value to the specified range.
     func clamped(
         lowerBound: CGFloat,
         upperBound: CGFloat
     ) -> CGFloat {
-
         Swift.min(
-            Swift.max(
-                self,
-                lowerBound
-            ),
+            Swift.max(self, lowerBound),
             upperBound
         )
     }

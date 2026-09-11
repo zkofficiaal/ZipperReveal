@@ -4,45 +4,33 @@
 //
 //  Created by Z.K   on 11/09/2026.
 //
-//  ViewModel responsible for direct zipper interaction.
+//  Direct gesture-driven zipper interaction state.
 //
 
 import Foundation
 import Combine
 import SwiftUI
 
-/// Owns the zipper's persistent interaction state.
-///
-/// The zipper is completely gesture-driven:
-/// - Drag down increases progress.
-/// - Drag up decreases progress.
-/// - Releasing the finger keeps the current progress.
-/// - A new drag starts from the current progress.
 @MainActor
 final class ZipperRevealViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    /// Opening progress from 0 to 1.
-    ///
-    /// 0 = completely closed.
-    /// 1 = completely open.
+    /// 0 = closed, 1 = fully open.
     @Published private(set) var progress: CGFloat = 0
 
-    /// Current visual phase derived from the user's drag direction.
+    /// Visual phase derived from the current progress and drag direction.
     @Published private(set) var phase: ZipperPhase = .closed
 
     // MARK: - Configuration
 
-    /// Central zipper configuration.
     let configuration: ZipperConfiguration
 
     // MARK: - Drag State
 
-    /// Progress at the moment the current drag begins.
+    /// Progress at the exact moment the current drag starts.
     private var dragStartProgress: CGFloat = 0
 
-    /// Indicates that a zipper drag is currently active.
     private var isDragging = false
 
     // MARK: - Initialization
@@ -51,21 +39,19 @@ final class ZipperRevealViewModel: ObservableObject {
         self.configuration = ZipperConfiguration()
     }
 
-    // MARK: - Drag Interaction
+    // MARK: - Drag
 
-    /// Starts a new drag from the zipper's current position.
+    /// Stores the current progress as the origin for a new drag.
     func beginDrag() {
         dragStartProgress = progress
         isDragging = true
     }
 
-    /// Updates the zipper directly from the finger/cursor translation.
+    /// Converts vertical finger/cursor movement into 0...1 progress.
     ///
-    /// Positive vertical translation opens the zipper.
-    /// Negative vertical translation closes it.
-    ///
-    /// No animation is applied here so the zipper follows the finger
-    /// immediately.
+    /// Positive translation opens the zipper.
+    /// Negative translation closes it.
+    /// The value is assigned directly so there is no animation lag.
     func updateDrag(
         translationY: CGFloat,
         zipperTravel: CGFloat
@@ -74,9 +60,6 @@ final class ZipperRevealViewModel: ObservableObject {
             return
         }
 
-        // The first change event establishes the starting point
-        // for this drag. Every following event uses the same
-        // starting progress, so the movement stays 1:1.
         if !isDragging {
             beginDrag()
         }
@@ -87,20 +70,18 @@ final class ZipperRevealViewModel: ObservableObject {
         let newProgress =
             dragStartProgress + normalizedTranslation
 
-        progress =
-            newProgress.clamped(
-                lowerBound: 0,
-                upperBound: 1
-            )
+        progress = newProgress.clamped(
+            lowerBound: 0,
+            upperBound: 1
+        )
 
         updatePhase(
             translationY: translationY
         )
     }
 
-    /// Ends the current drag.
-    ///
-    /// The current progress is intentionally left untouched.
+    /// Ends the drag without changing progress.
+    /// The zipper stays exactly where the finger was released.
     func endDrag() {
         isDragging = false
         updatePhase()
@@ -108,9 +89,6 @@ final class ZipperRevealViewModel: ObservableObject {
 
     // MARK: - Reset
 
-    /// Returns the zipper to the completely closed position.
-    ///
-    /// This is a direct state change, not an automatic animation.
     func reset() {
         progress = 0
         dragStartProgress = 0
@@ -120,21 +98,14 @@ final class ZipperRevealViewModel: ObservableObject {
 
     // MARK: - Phase
 
-    /// Updates the visual phase from the current interaction.
     private func updatePhase(
         translationY: CGFloat = 0
     ) {
         if progress <= 0.001 {
             phase = .closed
-            return
-        }
-
-        if progress >= 0.999 {
+        } else if progress >= 0.999 {
             phase = .opened
-            return
-        }
-
-        if translationY > 0.001 {
+        } else if translationY > 0.001 {
             phase = .opening
         } else if translationY < -0.001 {
             phase = .closing
