@@ -55,19 +55,19 @@ struct ZipperCanvasView: View {
                         configuration: configuration
                     )
 
-                // MARK: Closed State
+                // MARK: Closed / Opening / Fully Open
 
                 if progress <= 0.001 {
 
+                    // Completely closed: keep the original zipper artwork.
                     drawClosedZipper(
                         context: &context,
                         geometry: geometry
                     )
 
-                } else {
+                } else if progress < 0.98 {
 
-                    // MARK: Open / Opening State
-
+                    // Opening: keep the existing V-shaped zipper artwork.
                     drawOpeningZipper(
                         context: &context,
                         geometry: geometry,
@@ -77,6 +77,9 @@ struct ZipperCanvasView: View {
 
                 // MARK: Slider
 
+                // Keep the slider visible while the zipper opens.
+                // At the fully-open position the fabric, rails, and teeth
+                // disappear, leaving the clean phone screen underneath.
                 drawSlider(
                     context: &context,
                     geometry: geometry,
