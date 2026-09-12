@@ -130,7 +130,8 @@ struct ZipperCanvasView: View {
         // Draw center zipper tape.
         drawCenterTape(
             context: &context,
-            geometry: geometry
+            geometry: geometry,
+            progress: 0
         )
 
         // Draw zipper teeth.
@@ -161,38 +162,102 @@ struct ZipperCanvasView: View {
                 upperBound: 1
             )
 
-        // The opened fabric is a true V shape.
-        // Its inner edge starts wide at the top and converges
-        // exactly to the slider.
-        drawVFabric(
-            context: &context,
-            geometry: geometry,
-            progress: p,
-            side: .left
+        // MARK: Left Fabric
+
+        var leftFabric = Path()
+        let leftOuter = geometry.zipperLeft - geometry.fabricSeparation(progress: p)
+        let sliderY = geometry.sliderY(progress: p)
+
+        leftFabric.move(
+            to: CGPoint(x: leftOuter, y: geometry.zipperTop)
+        )
+        leftFabric.addLine(
+            to: CGPoint(x: leftOuter, y: geometry.zipperBottom)
+        )
+        leftFabric.addLine(
+            to: CGPoint(x: geometry.centerTrackLeft, y: geometry.zipperBottom)
+        )
+        leftFabric.addLine(
+            to: CGPoint(x: geometry.centerTrackLeft, y: sliderY)
         )
 
-        drawVFabric(
+        let sampleCount = 28
+        for index in stride(from: sampleCount, through: 0, by: -1) {
+            let y = sliderY
+                - (sliderY - geometry.zipperTop)
+                * CGFloat(index)
+                / CGFloat(sampleCount)
+
+            leftFabric.addLine(
+                to: CGPoint(
+                    x: geometry.leftRailX(at: y, progress: p),
+                    y: y
+                )
+            )
+        }
+        leftFabric.closeSubpath()
+
+        drawFabricPath(
             context: &context,
-            geometry: geometry,
-            progress: p,
-            side: .right
+            path: leftFabric
         )
 
-        // The two zipper rails follow the same V geometry.
+        // MARK: Right Fabric
+
+        var rightFabric = Path()
+        let rightOuter = geometry.zipperRight + geometry.fabricSeparation(progress: p)
+
+        rightFabric.move(
+            to: CGPoint(x: rightOuter, y: geometry.zipperTop)
+        )
+        rightFabric.addLine(
+            to: CGPoint(x: rightOuter, y: geometry.zipperBottom)
+        )
+        rightFabric.addLine(
+            to: CGPoint(x: geometry.centerTrackRight, y: geometry.zipperBottom)
+        )
+        rightFabric.addLine(
+            to: CGPoint(x: geometry.centerTrackRight, y: sliderY)
+        )
+
+        for index in 0...sampleCount {
+            let y = geometry.zipperTop
+                + (sliderY - geometry.zipperTop)
+                * CGFloat(index)
+                / CGFloat(sampleCount)
+
+            rightFabric.addLine(
+                to: CGPoint(
+                    x: geometry.rightRailX(at: y, progress: p),
+                    y: y
+                )
+            )
+        }
+        rightFabric.closeSubpath()
+
+        drawFabricPath(
+            context: &context,
+            path: rightFabric
+        )
+
+        // MARK: Opening Edges
+
         drawOpeningEdges(
             context: &context,
             geometry: geometry,
             progress: p
         )
 
-        // Only the zipper tape below the slider remains visible.
+        // MARK: Center Tape
+
         drawCenterTape(
             context: &context,
             geometry: geometry,
-            startY: geometry.sliderY(progress: p)
+            progress: p
         )
 
-        // Teeth are positioned directly on the V rails.
+        // MARK: Teeth
+
         drawTeeth(
             context: &context,
             geometry: geometry,
@@ -200,81 +265,36 @@ struct ZipperCanvasView: View {
         )
     }
 
-    // MARK: - V Fabric
-
-    private enum VFabricSide {
-        case left
-        case right
-    }
-
-    private func drawVFabric(
+    private func drawFabricPath(
         context: inout GraphicsContext,
-        geometry: ZipperGeometry,
-        progress: CGFloat,
-        side: VFabricSide
+        path: Path
     ) {
 
-        let points =
-            side == .left
-            ? geometry.leftFabricPathPoints(progress: progress)
-            : geometry.rightFabricPathPoints(progress: progress)
-
-        guard points.count >= 5 else {
-            return
-        }
-
-        var fabricPath =
-            Path()
-
-        fabricPath.move(
-            to: points[0]
-        )
-
-        for point in points.dropFirst() {
-            fabricPath.addLine(
-                to: point
-            )
-        }
-
-        fabricPath.closeSubpath()
-
         context.fill(
-            fabricPath,
+            path,
             with: .color(
                 Color.black.opacity(0.98)
             )
         )
 
-        // Clip the existing fabric texture to the V panel.
         context.drawLayer { layer in
-
             layer.clip(
-                to: fabricPath
+                to: path
             )
-
-            let bounds =
-                CGRect(
-                    x: geometry.zipperLeft
-                        - geometry.fabricSeparation(progress: progress),
-                    y: geometry.zipperTop,
-                    width: geometry.zipperWidth
-                        + geometry.fabricSeparation(progress: progress) * 2,
-                    height: geometry.zipperHeight
-                )
 
             drawFabricGrid(
                 context: &layer,
-                rect: bounds
+                rect: path.boundingRect
             )
 
             drawDiamondStitching(
                 context: &layer,
-                rect: bounds
+                rect: path.boundingRect
             )
         }
 
         context.stroke(
-            fabricPath,
+            path,
             with: .color(
                 Color.white.opacity(0.72)
             ),
@@ -600,88 +620,84 @@ struct ZipperCanvasView: View {
         progress: CGFloat
     ) {
 
-        let leftTop =
-            CGPoint(
-                x: geometry.topLeftRailX,
-                y: geometry.zipperTop
-            )
-
-        let rightTop =
-            CGPoint(
-                x: geometry.topRightRailX,
-                y: geometry.zipperTop
-            )
-
-        let slider =
+        let sliderPoint =
             geometry.sliderCenter(
                 progress: progress
             )
 
-        // Left V rail.
-        var leftPath =
-            Path()
+        let sampleCount = 36
 
+        var leftPath = Path()
         leftPath.move(
-            to: leftTop
+            to: geometry.leftOpeningPoint(
+                progress: progress
+            )
         )
 
-        leftPath.addLine(
-            to: slider
-        )
+        for index in 1...sampleCount {
+            let y = geometry.zipperTop
+                + (sliderPoint.y - geometry.zipperTop)
+                * CGFloat(index)
+                / CGFloat(sampleCount)
+
+            leftPath.addLine(
+                to: CGPoint(
+                    x: geometry.leftRailX(at: y, progress: progress),
+                    y: y
+                )
+            )
+        }
 
         context.stroke(
             leftPath,
             with: .color(
-                Color.white.opacity(0.82)
+                Color.white.opacity(0.75)
             ),
-            lineWidth: 1.1
+            lineWidth: 1.0
         )
 
-        // Right V rail.
-        var rightPath =
-            Path()
-
+        var rightPath = Path()
         rightPath.move(
-            to: rightTop
+            to: geometry.rightOpeningPoint(
+                progress: progress
+            )
         )
 
-        rightPath.addLine(
-            to: slider
+        for index in 1...sampleCount {
+            let y = geometry.zipperTop
+                + (sliderPoint.y - geometry.zipperTop)
+                * CGFloat(index)
+                / CGFloat(sampleCount)
+
+            rightPath.addLine(
+                to: CGPoint(
+                    x: geometry.rightRailX(at: y, progress: progress),
+                    y: y
+                )
+            )
+        }
+
+        context.stroke(
+            rightPath,
+            with: .color(
+                Color.white.opacity(0.75)
+            ),
+            lineWidth: 1.0
+        )
+
+        // Small dark shadow directly behind the opening rails.
+        context.stroke(
+            leftPath,
+            with: .color(
+                Color.black.opacity(0.65)
+            ),
+            lineWidth: 3
         )
 
         context.stroke(
             rightPath,
             with: .color(
-                Color.white.opacity(0.82)
-            ),
-            lineWidth: 1.1
-        )
-
-        // Dark shadow follows both rails to give the zipper
-        // the same depth as the reference.
-        var shadow =
-            Path()
-
-        shadow.move(
-            to: leftTop
-        )
-
-        shadow.addLine(
-            to: slider
-        )
-
-        shadow.move(
-            to: rightTop
-        )
-
-        shadow.addLine(
-            to: slider
-        )
-
-        context.stroke(
-            shadow,
-            with: .color(
-                Color.black.opacity(0.62)
+                Color.black.opacity(0.65)
             ),
             lineWidth: 3
         )
@@ -692,70 +708,117 @@ struct ZipperCanvasView: View {
     private func drawCenterTape(
         context: inout GraphicsContext,
         geometry: ZipperGeometry,
-        startY: CGFloat? = nil
+        progress: CGFloat
     ) {
 
-        let rect =
-            CGRect(
-                x: geometry.centerTrackLeft,
-                y: startY ?? geometry.zipperTop,
-                width: geometry.centerTrackWidth,
-                height: geometry.zipperBottom - (startY ?? geometry.zipperTop)
+        let p = progress.clamped(lowerBound: 0, upperBound: 1)
+        let sliderY = geometry.sliderY(progress: p)
+        let sampleCount = 36
+        let tapeWidth = geometry.centerTrackWidth * 0.42
+
+        // The open section flares with the same curved rails as the teeth.
+        if p > 0.001 {
+            var leftTape = Path()
+            var rightTape = Path()
+
+            let firstY = geometry.zipperTop
+            let firstLeft = geometry.leftRailX(at: firstY, progress: p)
+            let firstRight = geometry.rightRailX(at: firstY, progress: p)
+
+            leftTape.move(
+                to: CGPoint(x: firstLeft - tapeWidth / 2, y: firstY)
+            )
+            rightTape.move(
+                to: CGPoint(x: firstRight + tapeWidth / 2, y: firstY)
             )
 
-        // Outer dark tape.
-        context.fill(
-            Path(
-                rect
-            ),
-            with: .color(
-                Color.black.opacity(0.96)
+            for index in 0...sampleCount {
+                let y = geometry.zipperTop
+                    + (sliderY - geometry.zipperTop)
+                    * CGFloat(index)
+                    / CGFloat(sampleCount)
+
+                let leftX = geometry.leftRailX(at: y, progress: p)
+                let rightX = geometry.rightRailX(at: y, progress: p)
+
+                leftTape.addLine(
+                    to: CGPoint(x: leftX - tapeWidth / 2, y: y)
+                )
+                rightTape.addLine(
+                    to: CGPoint(x: rightX + tapeWidth / 2, y: y)
+                )
+            }
+
+            for index in stride(from: sampleCount, through: 0, by: -1) {
+                let y = geometry.zipperTop
+                    + (sliderY - geometry.zipperTop)
+                    * CGFloat(index)
+                    / CGFloat(sampleCount)
+                let leftX = geometry.leftRailX(at: y, progress: p)
+                leftTape.addLine(
+                    to: CGPoint(x: leftX + tapeWidth / 2, y: y)
+                )
+            }
+
+            for index in stride(from: sampleCount, through: 0, by: -1) {
+                let y = geometry.zipperTop
+                    + (sliderY - geometry.zipperTop)
+                    * CGFloat(index)
+                    / CGFloat(sampleCount)
+                let rightX = geometry.rightRailX(at: y, progress: p)
+                rightTape.addLine(
+                    to: CGPoint(x: rightX - tapeWidth / 2, y: y)
+                )
+            }
+
+            leftTape.closeSubpath()
+            rightTape.closeSubpath()
+
+            context.fill(
+                leftTape,
+                with: .color(Color.black.opacity(0.96))
             )
+            context.fill(
+                rightTape,
+                with: .color(Color.black.opacity(0.96))
+            )
+        }
+
+        // The lower, still-meshed section stays a straight center track.
+        let lowerRect = CGRect(
+            x: geometry.centerTrackLeft,
+            y: sliderY,
+            width: geometry.centerTrackWidth,
+            height: Swift.max(0, geometry.zipperBottom - sliderY)
         )
 
-        // Left metallic highlight.
-        let leftHighlight =
-            CGRect(
-                x: rect.minX + rect.width * 0.08,
-                y: rect.minY,
-                width: rect.width * 0.10,
-                height: rect.height
-            )
-
         context.fill(
-            Path(
-                leftHighlight
-            ),
-            with: .color(
-                Color.white.opacity(0.13)
-            )
+            Path(lowerRect),
+            with: .color(Color.black.opacity(0.96))
         )
 
-        // Right shadow.
-        let rightShadow =
-            CGRect(
-                x: rect.maxX - rect.width * 0.16,
-                y: rect.minY,
-                width: rect.width * 0.12,
-                height: rect.height
-            )
-
-        context.fill(
-            Path(
-                rightShadow
-            ),
-            with: .color(
-                Color.black.opacity(0.75)
-            )
+        let leftHighlight = CGRect(
+            x: geometry.centerTrackLeft + geometry.centerTrackWidth * 0.08,
+            y: sliderY,
+            width: geometry.centerTrackWidth * 0.10,
+            height: Swift.max(0, geometry.zipperBottom - sliderY)
         )
 
-        // Thin border.
-        context.stroke(
-            Path(rect),
-            with: .color(
-                Color.white.opacity(0.15)
-            ),
-            lineWidth: 0.7
+        context.fill(
+            Path(leftHighlight),
+            with: .color(Color.white.opacity(0.13))
+        )
+
+        let rightShadow = CGRect(
+            x: geometry.centerTrackRight - geometry.centerTrackWidth * 0.16,
+            y: sliderY,
+            width: geometry.centerTrackWidth * 0.12,
+            height: Swift.max(0, geometry.zipperBottom - sliderY)
+        )
+
+        context.fill(
+            Path(rightShadow),
+            with: .color(Color.black.opacity(0.75))
         )
     }
 
@@ -777,28 +840,15 @@ struct ZipperCanvasView: View {
 
         for index in 0..<configuration.toothCount {
 
-            let y =
-                geometry.toothY(
-                    index: index
-                )
-
-            let leftX =
-                geometry.toothX(
-                    side: -1,
-                    y: y,
-                    progress: progress
-                )
-
-            let rightX =
-                geometry.toothX(
-                    side: 1,
-                    y: y,
-                    progress: progress
-                )
+            let y = geometry.toothY(index: index)
 
             drawTooth(
                 context: &context,
-                x: leftX,
+                x: geometry.toothX(
+                    side: -1,
+                    y: y,
+                    progress: progress
+                ),
                 y: y,
                 width: toothWidth,
                 height: toothHeight
@@ -806,7 +856,11 @@ struct ZipperCanvasView: View {
 
             drawTooth(
                 context: &context,
-                x: rightX,
+                x: geometry.toothX(
+                    side: 1,
+                    y: y,
+                    progress: progress
+                ),
                 y: y,
                 width: toothWidth,
                 height: toothHeight
@@ -936,134 +990,184 @@ struct ZipperCanvasView: View {
         progress: CGFloat
     ) {
 
+        let tiltWindow = Swift.max(
+            configuration.sliderTiltWindow,
+            0.001
+        )
+
+        let tiltProgress: CGFloat
+        let tiltDirection: CGFloat
+
+        switch phase {
+        case .opening:
+            tiltProgress = (progress / tiltWindow)
+                .clamped(lowerBound: 0, upperBound: 1)
+            tiltDirection = 1
+
+        case .closing:
+            tiltProgress = ((1 - progress) / tiltWindow)
+                .clamped(lowerBound: 0, upperBound: 1)
+            tiltDirection = -1
+
+        default:
+            tiltProgress = 1
+            tiltDirection = 0
+        }
+
+        let tilt =
+            configuration.maximumSliderTiltDegrees
+            * sin(
+                (1 - tiltProgress)
+                * .pi
+                / 2
+            )
+            * tiltDirection
+
         let center =
             geometry.sliderCenter(
                 progress: progress
             )
 
-        let width =
-            geometry.sliderWidth
-
-        let height =
-            geometry.sliderHeight
-
-        let rect =
-            CGRect(
-                x: center.x - width / 2,
-                y: center.y - height / 2,
-                width: width,
-                height: height
+        context.drawLayer { layer in
+            layer.translateBy(
+                x: center.x,
+                y: center.y
             )
-
-        // MARK: Slider Shadow
-
-        let shadowRect =
-            rect.offsetBy(
-                dx: 1.5,
-                dy: 2.5
-            )
-
-        context.fill(
-            Path(
-                roundedRect:
-                    shadowRect,
-                cornerRadius:
-                    width * 0.18
-            ),
-            with: .color(
-                Color.black.opacity(0.85)
-            )
-        )
-
-        // MARK: Slider Body
-
-        let sliderPath =
-            Path(
-                roundedRect:
-                    rect,
-                cornerRadius:
-                    width * 0.18
-            )
-
-        context.fill(
-            sliderPath,
-            with: .linearGradient(
-                Gradient(
-                    colors: [
-                        Color.gray.opacity(0.90),
-                        Color.black.opacity(0.95),
-                        Color.gray.opacity(0.55)
-                    ]
-                ),
-                startPoint: CGPoint(
-                    x: rect.minX,
-                    y: rect.minY
-                ),
-                endPoint: CGPoint(
-                    x: rect.maxX,
-                    y: rect.maxY
+            layer.rotate(
+                by: Angle(
+                    degrees: Double(tilt)
                 )
             )
-        )
-
-        // MARK: Slider Border
-
-        context.stroke(
-            sliderPath,
-            with: .color(
-                Color.white.opacity(0.23)
-            ),
-            lineWidth: 0.8
-        )
-
-        // MARK: Slider Opening Hole
-
-        let holeRect =
-            CGRect(
-                x: rect.midX - width * 0.20,
-                y: rect.midY - height * 0.20,
-                width: width * 0.40,
-                height: height * 0.42
+            layer.translateBy(
+                x: -center.x,
+                y: -center.y
             )
 
-        context.fill(
-            Path(
-                roundedRect:
-                    holeRect,
-                cornerRadius:
-                    width * 0.08
-            ),
-            with: .color(
-                Color.black.opacity(0.88)
-            )
-        )
 
-        // MARK: Slider Highlight
+                let width =
+                    geometry.sliderWidth
 
-        var highlight =
-            Path()
+                let height =
+                    geometry.sliderHeight
 
-        highlight.move(
-            to: CGPoint(
-                x: rect.minX + width * 0.18,
-                y: rect.minY + height * 0.16
-            )
-        )
+                let rect =
+                    CGRect(
+                        x: center.x - width / 2,
+                        y: center.y - height / 2,
+                        width: width,
+                        height: height
+                    )
 
-        highlight.addLine(
-            to: CGPoint(
-                x: rect.maxX - width * 0.18,
-                y: rect.minY + height * 0.16
-            )
-        )
+                // MARK: Slider Shadow
 
-        context.stroke(
-            highlight,
-            with: .color(
-                Color.white.opacity(0.28)
-            ),
-            lineWidth: 0.8
-        )
+                let shadowRect =
+                    rect.offsetBy(
+                        dx: 1.5,
+                        dy: 2.5
+                    )
+
+                layer.fill(
+                    Path(
+                        roundedRect:
+                            shadowRect,
+                        cornerRadius:
+                            width * 0.18
+                    ),
+                    with: .color(
+                        Color.black.opacity(0.85)
+                    )
+                )
+
+                // MARK: Slider Body
+
+                let sliderPath =
+                    Path(
+                        roundedRect:
+                            rect,
+                        cornerRadius:
+                            width * 0.18
+                    )
+
+                layer.fill(
+                    sliderPath,
+                    with: .linearGradient(
+                        Gradient(
+                            colors: [
+                                Color.gray.opacity(0.90),
+                                Color.black.opacity(0.95),
+                                Color.gray.opacity(0.55)
+                            ]
+                        ),
+                        startPoint: CGPoint(
+                            x: rect.minX,
+                            y: rect.minY
+                        ),
+                        endPoint: CGPoint(
+                            x: rect.maxX,
+                            y: rect.maxY
+                        )
+                    )
+                )
+
+                // MARK: Slider Border
+
+                layer.stroke(
+                    sliderPath,
+                    with: .color(
+                        Color.white.opacity(0.23)
+                    ),
+                    lineWidth: 0.8
+                )
+
+                // MARK: Slider Opening Hole
+
+                let holeRect =
+                    CGRect(
+                        x: rect.midX - width * 0.20,
+                        y: rect.midY - height * 0.20,
+                        width: width * 0.40,
+                        height: height * 0.42
+                    )
+
+                layer.fill(
+                    Path(
+                        roundedRect:
+                            holeRect,
+                        cornerRadius:
+                            width * 0.08
+                    ),
+                    with: .color(
+                        Color.black.opacity(0.88)
+                    )
+                )
+
+                // MARK: Slider Highlight
+
+                var highlight =
+                    Path()
+
+                highlight.move(
+                    to: CGPoint(
+                        x: rect.minX + width * 0.18,
+                        y: rect.minY + height * 0.16
+                    )
+                )
+
+                highlight.addLine(
+                    to: CGPoint(
+                        x: rect.maxX - width * 0.18,
+                        y: rect.minY + height * 0.16
+                    )
+                )
+
+                layer.stroke(
+                    highlight,
+                    with: .color(
+                        Color.white.opacity(0.28)
+                    ),
+                    lineWidth: 0.8
+                )
+    
     }
 
     // MARK: - Smooth Transition

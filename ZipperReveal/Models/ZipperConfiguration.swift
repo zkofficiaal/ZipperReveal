@@ -60,6 +60,15 @@ struct ZipperConfiguration {
     /// Maximum horizontal movement of each fabric side.
     let maximumFabricSeparationRatio: CGFloat = 0.19
 
+    /// Controls how long the zipper rails stay wide before sweeping inward.
+    let openingCurveControlRatio: CGFloat = 0.82
+
+    /// Maximum temporary tilt of the zipper slider while it starts/stops moving.
+    let maximumSliderTiltDegrees: CGFloat = 7
+
+    /// Portion of the progress range used for the slider tilt.
+    let sliderTiltWindow: CGFloat = 0.12
+
     /// Amount of visible diagonal stitching.
     let stitchingOpacity: CGFloat = 0.32
 

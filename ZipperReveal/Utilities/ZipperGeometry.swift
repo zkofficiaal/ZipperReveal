@@ -65,7 +65,6 @@ struct ZipperGeometry {
     // MARK: - V Shape
 
     /// Half the distance between the two rails at the top of the V.
-    /// Increase this value to make the V wider.
     var topRailHalfWidth: CGFloat {
         zipperWidth * 0.30
     }
@@ -83,6 +82,19 @@ struct ZipperGeometry {
         sliderY(progress: progress)
     }
 
+    /// Curved half-width of the opening at a normalized position along the rail.
+    /// A quadratic curve keeps the rail wide near the top and sweeps inward near
+    /// the slider, matching the rounded V movement in the reference.
+    private func curvedHalfWidth(t value: CGFloat) -> CGFloat {
+        let t = value.clamped(lowerBound: 0, upperBound: 1)
+        let control = topRailHalfWidth
+            * configuration.openingCurveControlRatio
+        let oneMinusT = 1 - t
+
+        return oneMinusT * oneMinusT * topRailHalfWidth
+            + 2 * oneMinusT * t * control
+    }
+
     /// X coordinate of the left V rail at a given Y position.
     func leftRailX(at y: CGFloat, progress: CGFloat) -> CGFloat {
         let p = progress.clamped(lowerBound: 0, upperBound: 1)
@@ -96,8 +108,7 @@ struct ZipperGeometry {
         let t = ((y - zipperTop) / denominator)
             .clamped(lowerBound: 0, upperBound: 1)
 
-        return topLeftRailX
-            + (centerX - topLeftRailX) * t
+        return centerX - curvedHalfWidth(t: t)
     }
 
     /// X coordinate of the right V rail at a given Y position.
@@ -113,8 +124,7 @@ struct ZipperGeometry {
         let t = ((y - zipperTop) / denominator)
             .clamped(lowerBound: 0, upperBound: 1)
 
-        return topRightRailX
-            + (centerX - topRightRailX) * t
+        return centerX + curvedHalfWidth(t: t)
     }
 
     // MARK: - Center Track
@@ -167,38 +177,6 @@ struct ZipperGeometry {
             * p
     }
 
-    // MARK: - Fabric Paths
-
-    /// Points for the left fabric panel. The inner edge follows the V rail.
-    func leftFabricPathPoints(progress: CGFloat) -> [CGPoint] {
-        let p = progress.clamped(lowerBound: 0, upperBound: 1)
-        let sliderY = openingY(progress: p)
-        let outerLeft = zipperLeft - fabricSeparation(progress: p)
-
-        return [
-            CGPoint(x: outerLeft, y: zipperTop),
-            CGPoint(x: outerLeft, y: zipperBottom),
-            CGPoint(x: centerTrackLeft, y: zipperBottom),
-            CGPoint(x: centerTrackLeft, y: sliderY),
-            CGPoint(x: topLeftRailX, y: zipperTop)
-        ]
-    }
-
-    /// Points for the right fabric panel. The inner edge follows the V rail.
-    func rightFabricPathPoints(progress: CGFloat) -> [CGPoint] {
-        let p = progress.clamped(lowerBound: 0, upperBound: 1)
-        let sliderY = openingY(progress: p)
-        let outerRight = zipperRight + fabricSeparation(progress: p)
-
-        return [
-            CGPoint(x: outerRight, y: zipperTop),
-            CGPoint(x: outerRight, y: zipperBottom),
-            CGPoint(x: centerTrackRight, y: zipperBottom),
-            CGPoint(x: centerTrackRight, y: sliderY),
-            CGPoint(x: topRightRailX, y: zipperTop)
-        ]
-    }
-
     // MARK: - Opening Edges
 
     func leftOpeningPoint(progress: CGFloat) -> CGPoint {
@@ -227,22 +205,13 @@ struct ZipperGeometry {
             + toothSpacing * 0.5
     }
 
-    /// X coordinate of a tooth on either side of the V-shaped opening.
+    /// X coordinate of a tooth delegated directly to the shared curved rails.
     func toothX(side: CGFloat, y: CGFloat, progress: CGFloat) -> CGFloat {
-        let p = progress.clamped(lowerBound: 0, upperBound: 1)
-        let sliderY = openingY(progress: p)
-
-        if y <= sliderY {
-            let denominator = Swift.max(sliderY - zipperTop, 0.001)
-            let t = ((y - zipperTop) / denominator)
-                .clamped(lowerBound: 0, upperBound: 1)
-
-            let topX = side < 0 ? topLeftRailX : topRightRailX
-
-            return topX + (centerX - topX) * t
+        if side < 0 {
+            return leftRailX(at: y, progress: progress)
         }
 
-        return side < 0 ? centerTrackLeft : centerTrackRight
+        return rightRailX(at: y, progress: progress)
     }
 
     // MARK: - Utility

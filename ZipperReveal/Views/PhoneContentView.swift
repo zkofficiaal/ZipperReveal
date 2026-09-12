@@ -53,11 +53,11 @@ struct PhoneContentView: View {
                     )
                     .offset(
                         y: -phoneHeight * 0.455
-                    )
+                )
 
                 // MARK: Hello World
 
-                Text("Hello\nworld!")
+                Text("Hello!\nDevTechZahid")
                     .font(
                         .system(
                             size: phoneWidth * 0.080,
@@ -72,8 +72,8 @@ struct PhoneContentView: View {
                     )
                     .lineSpacing(
                         -2
-                    )
-
+                )
+                
                 // MARK: Bottom Decorative Object
 
                 bottomObject(
