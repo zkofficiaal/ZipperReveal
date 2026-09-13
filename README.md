@@ -122,22 +122,6 @@ This project is primarily a **SwiftUI animation and interaction experiment**, de
 4. Build and run.
 5. Drag the zipper to reveal the content.
 
-## Learning Focus
-
-This project demonstrates practical SwiftUI concepts such as:
-
-* `GeometryReader`
-* `Canvas`
-* `GraphicsContext`
-* `DragGesture`
-* `@Published`
-* `ObservableObject`
-* `@MainActor`
-* Custom `Path` drawing
-* Coordinate calculations
-* Progress-based animations
-* MVVM-style separation
-
 ## Designed and Developed by:
 
 **Muhammad Zahid Khan — Z.K **
