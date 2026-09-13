@@ -21,7 +21,7 @@ A smooth, interactive **zipper reveal animation** built with **SwiftUI**. The pr
 * No force unwraps
 * Reset functionality
 
-## 🛠️ Technologies
+## Technologies
 
 * **Swift**
 * **SwiftUI**
@@ -81,7 +81,7 @@ The user's vertical drag is converted into this progress value. The progress the
 | Release   | Keep current position  |
 | Reset     | Return to closed state |
 
-## 🧠 Architecture
+## Architecture
 
 The project separates responsibilities to keep the animation maintainable:
 
