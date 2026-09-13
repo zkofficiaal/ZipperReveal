@@ -138,7 +138,7 @@ This project demonstrates practical SwiftUI concepts such as:
 * Progress-based animations
 * MVVM-style separation
 
-## Author
+## Designed and Developed by:
 
 **Muhammad Zahid Khan — Z.K **
 
