@@ -72,15 +72,6 @@ The user's vertical drag is converted into this progress value. The progress the
 * Zipper visibility
 * Revealed phone content
 
-### Interaction
-
-| Gesture   | Action                 |
-| --------- | ---------------------- |
-| Drag Down | Open zipper            |
-| Drag Up   | Close zipper           |
-| Release   | Keep current position  |
-| Reset     | Return to closed state |
-
 ## Architecture
 
 The project separates responsibilities to keep the animation maintainable:
